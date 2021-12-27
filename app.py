@@ -5,20 +5,17 @@ import joblib
 import pandas as pd
 from flask import Flask, jsonify, request
 from peewee import (
-    Model, IntegerField, FloatField,
-    TextField, IntegrityError
+    SqliteDatabase, PostgresqlDatabase, Model, IntegerField,
+    FloatField, TextField, IntegrityError
 )
 from playhouse.shortcuts import model_to_dict
-from playhouse.db_url import connect
 
 
 ########################################
 # Begin database stuff
 
-# the connect function checks if there is a DATABASE_URL env var
-# if it exists, it uses it to connect to a remote postgres db
-# otherwise, it connects to a local sqlite db stored in predictions.db
-DB = connect(os.environ.get('DATABASE_URL') or 'sqlite:///predictions.db')
+DB = SqliteDatabase('predictions.db')
+
 
 class Prediction(Model):
     observation_id = IntegerField(unique=True)
@@ -42,72 +39,138 @@ DB.create_tables([Prediction], safe=True)
 with open('columns.json') as fh:
     columns = json.load(fh)
 
-pipeline = joblib.load('pipeline.pickle')
 
-with open('dtypes.pickle', 'rb') as fh:
+with open('pipeline.pickle', 'rb') as fh:
+    pipeline = joblib.load(fh)
+
+
+with open('baseline_model_dtypes.pickle', 'rb') as fh:
     dtypes = pickle.load(fh)
 
 
 # End model un-pickling
 ########################################
 
+########################################
+# Input validation functions
+
+#test missing observation_id and data
+def check_request(request):
+    try:
+        request['observation_id']
+    except:
+        error = "No observation_id found"
+        return False, error 
+    try:
+        request["data"]
+    except:
+        error = 'No data found in observation'
+    return True, ""
+
+#test missing columns and extra columns
+def check_columns(request):
+    keys = set(request["data"].keys())
+    if len(columns) - len(keys) > 0: 
+        missing = set(columns) - keys
+        error = "Missing columns: {}".format(missing)
+        return False, error
+
+    if len(keys) - len(columns) > 0: 
+        missing = keys - set(columns)
+        error = "Not expected columns: {}".format(missing)
+        return False, error
+
+    return True, ""
+
+#test invalid values for categorical features 
+def check_categorical_features(request,valid_cats, categorical_features):
+    
+    for cat in categorical_features:
+        if request['data'][cat] not in valid_cats:
+            error ="{} is not a valid value for {} category".format(request['data'][cat],cat)
+            return False, error
+    return True, ""
+
+#test invalid values for numerical features 
+def check_numerical_features(request, valid_cats, numerical_features):
+    for num_cat in numerical_features:
+        if request['data'][num_cat] not in valid_cats:
+            error ="{} is not a valid value for {} category".format(request['data'][num_cat], num_cat)
+            return False, error
+    return True, ""
+    
+
+# End input validation functions
+########################################
 
 ########################################
 # Begin webserver stuff
 
 app = Flask(__name__)
+valid_cats = [
+    'age'
+    'workclass',
+    'education',
+    'marital-status',
+    'race',
+    'sex',
+    'capital-gain',
+    'capital-loss',
+    'hours-per-week'
+    ]
+numerical_features = ['age', 'capital-gain', 'capital-loss', 'hours-per-week']
+categorical_features = [ 'workclass', 'education', 'marital-status', 'race', 'sex']
 
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    # flask provides a deserialization convenience function called
-    # get_json that will work if the mimetype is application/json
+    
     obs_dict = request.get_json()
+
+    #check observations
+    request_ok, error = check_request(obs_dict)
+    if not request_ok:
+        response = {'error': error}
+        return jsonify(response)
     _id = obs_dict['id']
     observation = obs_dict['observation']
-    # now do what we already learned in the notebooks about how to transform
-    # a single observation into a dataframe that will work with a pipeline
-    obs = pd.DataFrame([observation], columns=columns).astype(dtypes)
-    # now get ourselves an actual prediction of the positive class
-    proba = pipeline.predict_proba(obs)[0, 1]
-    response = {'proba': proba}
+
+    columns_ok, error = check_columns(observation)
+    if not columns_ok:
+        response = {'error': error}
+        return jsonify(response)
+
+    categories_ok, error = check_categorical_features(observation)
+    if not categories_ok:
+        response = {'error': error}
+        return jsonify(response)
+
+    numerical_features_ok, error = check_numerical_features(observation)
+    if not numerical_features_ok:
+        response = {'error': error}
+        return jsonify(response)
+
+    df_request = pd.DataFrame([observation], columns = columns).astype(dtypes) 
+    proba = pipeline.predict_proba(df_request)[0, 1]
+    prediction = pipeline.predict(df_request)[0]
+    
+    response = {'prediction': bool(prediction), 'proba': proba}
+
     p = Prediction(
         observation_id=_id,
         proba=proba,
-        observation=request.data
+        observation=request.data,
     )
     try:
         p.save()
     except IntegrityError:
-        error_msg = 'Observation ID: "{}" already exists'.format(_id)
-        response['error'] = error_msg
+        error_msg = "ERROR: Observation ID: '{}' already exists".format(_id)
+        response["error"] = error_msg
         print(error_msg)
         DB.rollback()
     return jsonify(response)
 
-
-@app.route('/update', methods=['POST'])
-def update():
-    obs = request.get_json()
-    try:
-        p = Prediction.get(Prediction.observation_id == obs['id'])
-        p.true_class = obs['true_class']
-        p.save()
-        return jsonify(model_to_dict(p))
-    except Prediction.DoesNotExist:
-        error_msg = 'Observation ID: "{}" does not exist'.format(obs['id'])
-        return jsonify({'error': error_msg})
-
-
-@app.route('/list-db-contents')
-def list_db_contents():
-    return jsonify([
-        model_to_dict(obs) for obs in Prediction.select()
-    ])
-
-
-# End webserver stuff
-########################################
-
+    
+    
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run()

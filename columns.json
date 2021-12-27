@@ -1,1 +1,1 @@
-["Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Cabin", "Embarked"]
+["age", "workclass", "education", "marital-status", "race", "sex", "capital-gain", "capital-loss", "hours-per-week"]
