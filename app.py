@@ -131,7 +131,7 @@ def predict():
         response = {'error': error}
         return jsonify(response)
     _id = obs_dict['observation_id']
-    observation = obs_dict['data']
+    observation = obs_dict
 
     columns_ok, error = check_columns(observation)
     if not columns_ok:
