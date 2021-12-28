@@ -68,8 +68,8 @@ def check_request(request):
     return True, ""
 
 #test missing columns and extra columns
-def check_columns(request):
-    keys = set(request["data"].keys())
+def check_columns(observation):
+    keys = set(observation.keys())
     if len(columns) - len(keys) > 0: 
         missing = set(columns) - keys
         error = "Missing columns: {}".format(missing)
@@ -83,19 +83,19 @@ def check_columns(request):
     return True, ""
 
 #test invalid values for categorical features 
-def check_categorical_features(request,valid_cats, categorical_features):
+def check_categorical_features(observation,valid_cats, categorical_features):
     
     for cat in categorical_features:
-        if request['data'][cat] not in valid_cats:
-            error ="{} is not a valid value for {} category".format(request['data'][cat],cat)
+        if observation[cat] not in valid_cats:
+            error ="{} is not a valid value for {} category".format(observation[cat],cat)
             return False, error
     return True, ""
 
 #test invalid values for numerical features 
-def check_numerical_features(request, valid_cats, numerical_features):
+def check_numerical_features(observation, valid_cats, numerical_features):
     for num_cat in numerical_features:
-        if request['data'][num_cat] not in valid_cats:
-            error ="{} is not a valid value for {} category".format(request['data'][num_cat], num_cat)
+        if observation[num_cat] not in valid_cats:
+            error ="{} is not a valid value for {} category".format(observation[num_cat], num_cat)
             return False, error
     return True, ""
     
@@ -140,12 +140,12 @@ def predict():
         response = {'error': error}
         return jsonify(response)
 
-    categories_ok, error = check_categorical_features(observation)
+    categories_ok, error = check_categorical_features(observation, valid_cats, categorical_features)
     if not categories_ok:
         response = {'error': error}
         return jsonify(response)
 
-    numerical_features_ok, error = check_numerical_features(observation)
+    numerical_features_ok, error = check_numerical_features(observation, valid_cats, numerical_features)
     if not numerical_features_ok:
         response = {'error': error}
         return jsonify(response)
