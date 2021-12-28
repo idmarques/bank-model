@@ -65,6 +65,7 @@ def check_request(request):
         request["data"]
     except:
         error = 'No data found in observation'
+        return False, error 
     return True, ""
 
 #test missing columns and extra columns
@@ -131,7 +132,7 @@ def predict():
         response = {'error': error}
         return jsonify(response)
     _id = obs_dict['observation_id']
-    observation = obs_dict
+    observation = obs_dict['data']
 
     columns_ok, error = check_columns(observation)
     if not columns_ok:
