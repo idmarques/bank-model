@@ -81,19 +81,27 @@ def check_columns(observation):
         return False, error
 
     return True, ""
+    
+#categories: A list of potential values for column
+def get_valid_categories(df, column):
+    categories = df[column].unique().tolist()    
+
+    return categories
 
 #test invalid values for categorical features 
-def check_categorical_features(observation,valid_cats, categorical_features):
+def check_categorical_features(observation, df, categorical_features):
     
     for cat in categorical_features:
+        valid_cats = get_valid_categories(df, cat)
         if observation[cat] not in valid_cats:
             error ="{} is not a valid value for {} category".format(observation[cat],cat)
             return False, error
     return True, ""
 
 #test invalid values for numerical features 
-def check_numerical_features(observation, valid_cats, numerical_features):
+def check_numerical_features(observation, df, numerical_features):
     for num_cat in numerical_features:
+        valid_cats = get_valid_categories(df, num_cat)
         if observation[num_cat] not in valid_cats:
             error ="{} is not a valid value for {} category".format(observation[num_cat], num_cat)
             return False, error
@@ -107,17 +115,7 @@ def check_numerical_features(observation, valid_cats, numerical_features):
 # Begin webserver stuff
 
 app = Flask(__name__)
-valid_cats = [
-    'age'
-    'workclass',
-    'education',
-    'marital-status',
-    'race',
-    'sex',
-    'capital-gain',
-    'capital-loss',
-    'hours-per-week'
-    ]
+df = pd.read_csv("bank.csv")
 numerical_features = ['age', 'capital-gain', 'capital-loss', 'hours-per-week']
 categorical_features = [ 'workclass', 'education', 'marital-status', 'race', 'sex']
 
