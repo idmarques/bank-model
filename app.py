@@ -44,7 +44,7 @@ with open('pipeline.pickle', 'rb') as fh:
     pipeline = joblib.load(fh)
 
 
-with open('baseline_model_dtypes.pickle', 'rb') as fh:
+with open('dtypes.pickle', 'rb') as fh:
     dtypes = pickle.load(fh)
 
 
