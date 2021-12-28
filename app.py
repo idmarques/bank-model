@@ -152,7 +152,7 @@ def predict():
     proba = pipeline.predict_proba(df_request)[0, 1]
     prediction = pipeline.predict(df_request)[0]
     
-    response = {'prediction': bool(prediction), 'proba': proba}
+    response = {'prediction': bool(prediction), 'probability': proba}
 
     p = Prediction(
         observation_id=_id,
