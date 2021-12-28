@@ -138,12 +138,12 @@ def predict():
         response = {'error': error}
         return jsonify(response)
 
-    categories_ok, error = check_categorical_features(observation, valid_cats, categorical_features)
+    categories_ok, error = check_categorical_features(observation, df, categorical_features)
     if not categories_ok:
         response = {'error': error}
         return jsonify(response)
 
-    numerical_features_ok, error = check_numerical_features(observation, valid_cats, numerical_features)
+    numerical_features_ok, error = check_numerical_features(observation, df, numerical_features)
     if not numerical_features_ok:
         response = {'error': error}
         return jsonify(response)
